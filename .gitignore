@@ -144,6 +144,22 @@ ENV/
 env.bak/
 venv.bak/
 
+# Docker
+.env
+docker-compose.override.yml
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+smart_email_advisor.db
+backups/
+
+# Logs
+logs/
+*.log
+
 # Spyder project settings
 .spyderproject
 .spyproject

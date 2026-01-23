@@ -2,7 +2,7 @@
 
 AI-орієнтований бекенд сервіс для інтелектуального аналізу електронних листів.
 
-## 🚀 Особливості
+## Особливості
 
 - **AI Аналіз** - Використання GPT-4 для аналізу пріоритету, категоризації та тональності листів
 - **Розумні рекомендації** - Автоматична генерація рекомендацій щодо дій з листами
@@ -16,18 +16,21 @@ AI-орієнтований бекенд сервіс для інтелекту�
 ### API Endpoints:
 
 #### Автентифікація:
+
 - `POST /api/auth/register` - реєстрація нового користувача
 - `POST /api/auth/login` - авторизація користувача
 - `GET /api/auth/me` - інформація про поточного користувача
 - `POST /api/auth/refresh` - оновлення токену
 
 #### Аналіз електронної пошти:
+
 - `POST /api/emails/analyze` - аналіз окремого листа
 - `POST /api/emails/summarize` - створення резюме листа
 - `POST /api/emails/recommendations` - отримання рекомендацій
 - `POST /api/emails/batch-analyze` - пакетний аналіз листів
 
 #### Аналітика:
+
 - `GET /api/analytics/dashboard` - метрики дашборду
 - `GET /api/analytics/activity` - статистика активності
 - `GET /api/analytics/trends` - тренди по електронній пошті
@@ -48,28 +51,33 @@ AI-орієнтований бекенд сервіс для інтелекту�
 ### Локальне середовище:
 
 1. Клонуйте репозиторій та перейдіть до директорії backend:
+
 ```bash
 cd backend
 ```
 
 2. Створіть віртуальне середовище:
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
 
 3. Встановіть залежності:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 4. Налаштуйте змінні середовища:
+
 ```bash
 cp .env.example .env
 # Відредагуйте .env файл з вашими налаштуваннями
 ```
 
 5. Запустіть сервер:
+
 ```bash
 uvicorn main:app --reload
 ```
@@ -90,6 +98,7 @@ docker run -p 8000:8000 --env-file .env smart-email-advisor-backend
 ## Конфігурація
 
 ### Обов'язкові змінні середовища:
+
 - `DATABASE_URL` - URL PostgreSQL бази даних
 - `MONGODB_URL` - URL MongoDB бази даних
 - `REDIS_URL` - URL Redis сервера
@@ -97,6 +106,7 @@ docker run -p 8000:8000 --env-file .env smart-email-advisor-backend
 - `SECRET_KEY` - секретний ключ для JWT
 
 ### Опціональні налаштування:
+
 - `DEBUG` - режим налагодження (default: False)
 - `ACCESS_TOKEN_EXPIRE_MINUTES` - час життя токену (default: 30)
 - `ALGORITHM` - алгоритм JWT (default: HS256)
@@ -127,11 +137,13 @@ backend/
 ## Тестування
 
 Запуск тестів:
+
 ```bash
 pytest tests/ -v
 ```
 
 Запуск з покриттям:
+
 ```bash
 pytest tests/ --cov=app --cov-report=html
 ```
@@ -139,12 +151,14 @@ pytest tests/ --cov=app --cov-report=html
 ## API Документація
 
 Після запуску сервера, повна API документація доступна за адресами:
+
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
 ## Розробка
 
 ### Додавання нових функцій:
+
 1. Створіть нову гілку: `git checkout -b feature-name`
 2. Додайте необхідні моделі в `app/models/`
 3. Створіть або оновіть роути в `app/routes/`
@@ -154,6 +168,7 @@ pytest tests/ --cov=app --cov-report=html
 7. Створіть pull request
 
 ### Корисні команди:
+
 ```bash
 # Автоформатування коду
 black app/ tests/
