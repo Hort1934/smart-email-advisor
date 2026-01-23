@@ -7,28 +7,96 @@ services:
     container_name: smart-email-advisor-db
     restart: always
     environment:
-      POSTGRES_DB: smart_email_advisor
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: ${POSTGRES_DB:-smart_email_advisor}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/backup:/backup
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     networks:
       - smart-email-network
 
-  # Redis для кешування
+  # Redis для кешування та черги повідомлень
   redis:
     image: redis:7-alpine
     container_name: smart-email-advisor-redis
     restart: always
+    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     networks:
       - smart-email-network
+
+  # AI Agent сервіс для роботи з LLM
+  ai-agent:
+    build: 
+      context: ./ai-agent
+      dockerfile: Dockerfile
+    container_name: smart-email-advisor-ai-agent
+    restart: always
+    ports:
+      - "${AI_AGENT_PORT:-8001}:8001"
+    environment:
+      # Database
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres123}@db:5432/${POSTGRES_DB:-smart_email_advisor}
+      - REDIS_URL=redis://redis:6379${REDIS_PASSWORD:+?password=${REDIS_PASSWORD}}
+      
+      # AI Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_MODEL=${AI_MODEL:-gpt-4}
+      - AI_TEMPERATURE=${AI_TEMPERATURE:-0.3}
+      
+      # AWS Configuration
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_BEDROCK_ENDPOINT=${AWS_BEDROCK_ENDPOINT}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      
+      # Application
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
+      - DEBUG=${DEBUG:-true}
+      - ENVIRONMENT=${ENVIRONMENT:-docker}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # Email Processing
+      - EMAIL_QUEUE_NAME=${EMAIL_QUEUE_NAME:-email_processing}
+      - MAX_EMAILS_PER_MINUTE=${MAX_EMAILS_PER_MINUTE:-100}
+      
+      # Rules Configuration
+      - LLM_RULES_PATH=${LLM_RULES_PATH:-/app/config/llm_rules.json}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./ai-agent:/app
+      - ./config:/app/config:ro
+      - ai_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - smart-email-network
+    profiles:
+      - development
+      - production
 
   # Backend API сервіс
   backend:
@@ -38,24 +106,97 @@ services:
     container_name: smart-email-advisor-backend
     restart: always
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres123@db:5432/smart_email_advisor
-      - REDIS_URL=redis://redis:6379
-      - SECRET_KEY=docker-secret-key-change-in-production
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - DEBUG=True
-      - ENVIRONMENT=docker
+      # Database
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres123}@db:5432/${POSTGRES_DB:-smart_email_advisor}
+      - REDIS_URL=redis://redis:6379${REDIS_PASSWORD:+?password=${REDIS_PASSWORD}}
+      
+      # Authentication
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      
+      # AWS Configuration
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - AWS_SES_REGION=${AWS_SES_REGION}
+      - AWS_LAMBDA_FUNCTION=${AWS_LAMBDA_FUNCTION}
+      
+      # Application
+      - DEBUG=${DEBUG:-true}
+      - ENVIRONMENT=${ENVIRONMENT:-docker}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # AI Agent Communication
+      - AI_AGENT_URL=${AI_AGENT_URL:-http://ai-agent:8001}
+      
+      # Email Configuration
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - EMAIL_ADDRESS=${EMAIL_ADDRESS}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-agent:
+        condition: service_healthy
     volumes:
       - ./backend:/app
       - backend_logs:/app/logs
+      - ./config:/app/config:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - smart-email-network
+    profiles:
+      - development
+      - production
 
-  # Frontend сервіс (для майбутнього використання)
+  # Event Bridge для обробки подій
+  event-bridge:
+    build: 
+      context: ./event-bridge
+      dockerfile: Dockerfile
+    container_name: smart-email-advisor-event-bridge
+    restart: always
+    environment:
+      - REDIS_URL=redis://redis:6379${REDIS_PASSWORD:+?password=${REDIS_PASSWORD}}
+      - AI_AGENT_URL=http://ai-agent:8001
+      - BACKEND_URL=http://backend:8000
+      
+      # AWS SES/SNS Configuration
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_SES_CONFIG_SET=${AWS_SES_CONFIG_SET}
+      - AWS_SNS_TOPIC_ARN=${AWS_SNS_TOPIC_ARN}
+      
+      # Email Processing
+      - EMAIL_QUEUE_NAME=${EMAIL_QUEUE_NAME:-email_processing}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      
+      - DEBUG=${DEBUG:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      redis:
+        condition: service_healthy
+      ai-agent:
+        condition: service_healthy
+    volumes:
+      - ./event-bridge:/app
+      - event_logs:/app/logs
+    networks:
+      - smart-email-network
+    profiles:
+      - development
+      - production
+      - event-processing
+
+  # Frontend сервіс
   frontend:
     build: 
       context: ./frontend
@@ -63,51 +204,83 @@ services:
     container_name: smart-email-advisor-frontend
     restart: always
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
-      - NODE_ENV=development
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000}
+      - REACT_APP_WS_URL=${REACT_APP_WS_URL:-ws://localhost:8000}
+      - NODE_ENV=${NODE_ENV:-development}
+      - GENERATE_SOURCEMAP=${GENERATE_SOURCEMAP:-false}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - frontend_build:/app/build
     networks:
       - smart-email-network
     profiles:
-      - frontend  # Опціональний профіль, поки фронтенд не створено
+      - frontend
 
-  # Nginx для проксування та статичних файлів
+  # Nginx для проксування
   nginx:
     image: nginx:alpine
     container_name: smart-email-advisor-nginx
     restart: always
     ports:
-      - "80:80"
-      - "443:443"
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - frontend_build:/var/www/html
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - smart-email-network
     profiles:
-      - production  # Тільки для продакшену
+      - production
 
-  # Adminer для управління базою даних (опціонально)
+  # Adminer для управління базою даних
   adminer:
-    image: adminer
+    image: adminer:4.8.1
     container_name: smart-email-advisor-adminer
     restart: always
     ports:
-      - "8080:8080"
+      - "${ADMINER_PORT:-8080}:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=db
+      - ADMINER_DESIGN=pepa-linha
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - smart-email-network
     profiles:
-      - dev  # Тільки для розробки
+      - dev
+
+  # Monitoring та Logging
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: smart-email-advisor-prometheus
+    restart: always
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - smart-email-network
+    profiles:
+      - monitoring
 
 volumes:
   postgres_data:
@@ -116,7 +289,18 @@ volumes:
     driver: local
   backend_logs:
     driver: local
+  ai_logs:
+    driver: local
+  event_logs:
+    driver: local
+  frontend_build:
+    driver: local
+  prometheus_data:
+    driver: local
 
 networks:
   smart-email-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

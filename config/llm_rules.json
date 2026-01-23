@@ -1,0 +1,183 @@
+{
+  "version": "1.0",
+  "description": "LLM Rules Configuration for Smart Email Advisor",
+  "last_updated": "2026-01-23",
+  
+  "priority_rules": {
+    "urgent": {
+      "keywords": ["urgent", "asap", "emergency", "critical", "immediately", "now", "терміново", "негайно", "критично", "екстрено"],
+      "sender_patterns": ["ceo@", "director@", "emergency@", "urgent@"],
+      "subject_patterns": ["urgent:", "emergency:", "critical:", "asap:", "!!! "],
+      "time_sensitivity": ["today", "tonight", "within hour", "end of day", "сьогодні", "до кінця дня"],
+      "score_threshold": 0.9
+    },
+    "high": {
+      "keywords": ["important", "deadline", "meeting", "project", "client", "важливо", "дедлайн", "зустріч", "проект"],
+      "sender_patterns": ["manager@", "lead@", "pm@", "client@"],
+      "subject_patterns": ["important:", "deadline:", "meeting:", "проект:"],
+      "time_sensitivity": ["tomorrow", "this week", "next week", "завтра", "цей тиждень"],
+      "score_threshold": 0.7
+    },
+    "medium": {
+      "keywords": ["update", "info", "review", "feedback", "follow up", "оновлення", "інформація", "відгук"],
+      "sender_patterns": ["team@", "info@", "update@"],
+      "subject_patterns": ["update:", "info:", "review:", "fyi:"],
+      "time_sensitivity": ["next month", "when possible", "наступний місяць"],
+      "score_threshold": 0.5
+    },
+    "low": {
+      "keywords": ["newsletter", "promotion", "sale", "offer", "розпродаж", "акція", "пропозиція"],
+      "sender_patterns": ["no-reply@", "noreply@", "marketing@", "promo@"],
+      "subject_patterns": ["newsletter", "promotion:", "sale:", "offer:"],
+      "time_sensitivity": [],
+      "score_threshold": 0.3
+    }
+  },
+
+  "category_rules": {
+    "work": {
+      "keywords": ["meeting", "project", "deadline", "task", "work", "office", "team", "client", "зустріч", "проект", "робота", "офіс"],
+      "sender_domains": ["company.com", "work.com", "office.com"],
+      "time_patterns": ["9am", "10am", "2pm", "3pm", "business hours"],
+      "confidence_threshold": 0.8
+    },
+    "personal": {
+      "keywords": ["family", "friend", "personal", "home", "birthday", "holiday", "сім'я", "друг", "особисте", "дім", "день народження"],
+      "sender_patterns": ["gmail.com", "yahoo.com", "hotmail.com"],
+      "time_patterns": ["evening", "weekend", "вечір", "вихідні"],
+      "confidence_threshold": 0.7
+    },
+    "marketing": {
+      "keywords": ["sale", "discount", "offer", "promotion", "buy now", "limited time", "розпродаж", "знижка", "акція"],
+      "sender_patterns": ["marketing@", "promo@", "deals@", "offers@"],
+      "unsubscribe_present": true,
+      "confidence_threshold": 0.9
+    },
+    "notification": {
+      "keywords": ["notification", "alert", "reminder", "update", "сповіщення", "нагадування", "оповіщення"],
+      "sender_patterns": ["no-reply@", "noreply@", "notification@", "alerts@"],
+      "automated": true,
+      "confidence_threshold": 0.8
+    },
+    "spam": {
+      "keywords": ["win money", "free", "guaranteed", "act now", "click here", "виграй гроші", "безкоштовно"],
+      "suspicious_patterns": ["excessive caps", "multiple exclamation marks", "suspicious links"],
+      "sender_reputation": "low",
+      "confidence_threshold": 0.95
+    }
+  },
+
+  "sentiment_analysis": {
+    "positive": {
+      "keywords": ["great", "excellent", "amazing", "wonderful", "perfect", "відмінно", "чудово", "прекрасно"],
+      "emotional_indicators": ["excited", "happy", "pleased", "радий", "щасливий"],
+      "punctuation": ["!", "😊", "👍", "🎉"]
+    },
+    "negative": {
+      "keywords": ["terrible", "awful", "disappointed", "frustrated", "angry", "жахливо", "розчарований", "злий"],
+      "emotional_indicators": ["upset", "concerned", "worried", "засмучений", "стурбований"],
+      "punctuation": ["!!!", "😞", "😠", "👎"]
+    },
+    "neutral": {
+      "keywords": ["information", "update", "meeting", "schedule", "інформація", "оновлення", "розклад"],
+      "formal_language": true,
+      "business_tone": true
+    }
+  },
+
+  "response_recommendations": {
+    "urgent_emails": {
+      "action": "immediate_response",
+      "suggested_time": "within 1 hour",
+      "template": "urgent_response",
+      "priority": 1
+    },
+    "client_emails": {
+      "action": "professional_response",
+      "suggested_time": "within 4 hours",
+      "template": "client_response",
+      "priority": 2
+    },
+    "internal_team": {
+      "action": "collaborative_response",
+      "suggested_time": "within 24 hours",
+      "template": "team_response",
+      "priority": 3
+    },
+    "marketing_emails": {
+      "action": "archive_or_unsubscribe",
+      "suggested_time": "when convenient",
+      "template": null,
+      "priority": 4
+    }
+  },
+
+  "spam_detection": {
+    "high_risk_indicators": [
+      "Multiple recipients in BCC",
+      "Suspicious sender domain",
+      "Excessive use of capital letters",
+      "Multiple exclamation marks (!!!)",
+      "Phrases like 'Act now', 'Limited time'",
+      "Requests for personal information",
+      "Suspicious attachments"
+    ],
+    "medium_risk_indicators": [
+      "Unknown sender",
+      "Generic greeting",
+      "Urgent language without context",
+      "External links from unknown domains"
+    ],
+    "whitelist_domains": [
+      "company.com",
+      "trusted-partner.com",
+      "gmail.com",
+      "outlook.com"
+    ]
+  },
+
+  "email_patterns": {
+    "meeting_requests": {
+      "keywords": ["meeting", "call", "schedule", "зустріч", "дзвінок", "запланувати"],
+      "actions": ["extract_datetime", "check_calendar", "suggest_response"],
+      "priority_boost": 0.2
+    },
+    "project_updates": {
+      "keywords": ["update", "progress", "status", "report", "оновлення", "прогрес", "звіт"],
+      "actions": ["extract_project_info", "track_progress", "notify_stakeholders"],
+      "category_override": "work"
+    },
+    "deadline_notifications": {
+      "keywords": ["deadline", "due date", "expires", "дедлайн", "термін виконання"],
+      "actions": ["extract_deadline", "set_reminder", "prioritize_high"],
+      "priority_boost": 0.3
+    }
+  },
+
+  "learning_rules": {
+    "user_patterns": {
+      "track_response_times": true,
+      "learn_priority_preferences": true,
+      "adapt_to_user_behavior": true,
+      "feedback_incorporation": true
+    },
+    "sender_reputation": {
+      "build_sender_profiles": true,
+      "track_interaction_history": true,
+      "adjust_priority_based_on_history": true
+    }
+  },
+
+  "integration_settings": {
+    "calendar_integration": {
+      "check_availability": true,
+      "suggest_meeting_times": true,
+      "auto_schedule_low_priority": false
+    },
+    "task_management": {
+      "create_tasks_from_emails": true,
+      "track_email_based_deadlines": true,
+      "integrate_with_project_tools": true
+    }
+  }
+}

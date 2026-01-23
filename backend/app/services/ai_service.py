@@ -2,11 +2,13 @@ import openai
 import os
 import json
 import asyncio
+import aiohttp
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 import re
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
+import logging
 
 from app.models.schemas import (
     EmailAnalysisRequest, 
@@ -16,6 +18,9 @@ from app.models.schemas import (
     EmailSummary,
     SmartRecommendation
 )
+from app.services.ai_service_helpers import _convert_ai_result_to_response, _fallback_analysis
+
+logger = logging.getLogger(__name__)
 
 class AIService:
     def __init__(self):
@@ -26,9 +31,56 @@ class AIService:
             chunk_size=1000,
             chunk_overlap=200
         )
+        self.ai_agent_url = os.getenv("AI_AGENT_URL", "http://ai-agent:8001")
     
     async def analyze_email(self, request: EmailAnalysisRequest) -> EmailAnalysisResponse:
-        """Аналіз електронного листа з використанням AI"""
+        """Аналіз електронного листа з використанням AI Agent або OpenAI"""
+        
+        try:
+            # Спробувати використати AI Agent сервіс
+            email_data = {
+                "id": str(request.id) if hasattr(request, 'id') else None,
+                "subject": request.subject,
+                "content": request.content,
+                "sender": request.sender,
+                "recipient": request.recipient,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            if self.ai_agent_url:
+                result = await self._analyze_with_ai_agent(email_data)
+                if result:
+                    return _convert_ai_result_to_response(result, request)
+            
+            # Fallback до прямого виклику OpenAI
+            return await self._analyze_with_openai_direct(request)
+            
+        except Exception as e:
+            logger.error(f"Email analysis failed: {e}")
+            return _fallback_analysis(request)
+    
+    async def _analyze_with_ai_agent(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Аналіз через AI Agent сервіс"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.ai_agent_url}/analyze",
+                    json=email_data,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        logger.info(f"AI Agent analysis completed for email {email_data.get('id')}")
+                        return result
+                    else:
+                        logger.error(f"AI Agent returned status {response.status}")
+                        return None
+                        
+        except Exception as e:
+            logger.error(f"AI Agent analysis failed: {e}")
+            return None
+    
+    async def _analyze_with_openai_direct(self, request: EmailAnalysisRequest) -> EmailAnalysisResponse:
         
         # Підготовка промпту для аналізу
         analysis_prompt = f"""
