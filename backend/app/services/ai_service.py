@@ -24,9 +24,12 @@ logger = logging.getLogger(__name__)
 
 class AIService:
     def __init__(self):
-        self.openai_client = openai.AsyncOpenAI(
-            api_key=os.getenv("OPENAI_API_KEY")
-        )
+        # Only initialize OpenAI client if key exists.
+        # Otherwise, backend can still work via AI Agent (and fallback analysis).
+        openai_key = os.getenv("OPENAI_API_KEY")
+        self.openai_client = None
+        if openai_key and openai_key != "your-openai-api-key-here":
+            self.openai_client = openai.AsyncOpenAI(api_key=openai_key)
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
@@ -51,9 +54,20 @@ class AIService:
                 result = await self._analyze_with_ai_agent(email_data)
                 if result:
                     return _convert_ai_result_to_response(result, request)
+                else:
+                    logger.warning("AI Agent returned None, trying OpenAI fallback")
             
-            # Fallback до прямого виклику OpenAI
-            return await self._analyze_with_openai_direct(request)
+            # Fallback до прямого виклику OpenAI (тільки якщо є API ключ)
+            if os.getenv("OPENAI_API_KEY"):
+                try:
+                    return await self._analyze_with_openai_direct(request)
+                except Exception as e:
+                    logger.error(f"OpenAI direct analysis failed: {e}")
+                    # Fallback to basic analysis
+                    return _fallback_analysis(request)
+            else:
+                logger.warning("OPENAI_API_KEY not set, using fallback analysis")
+                return _fallback_analysis(request)
             
         except Exception as e:
             logger.error(f"Email analysis failed: {e}")
@@ -78,6 +92,7 @@ class AIService:
                         
         except Exception as e:
             logger.error(f"AI Agent analysis failed: {e}")
+            logger.error(f"AI Agent URL: {self.ai_agent_url}, Email data: {email_data.get('subject', 'N/A')}")
             return None
     
     async def _analyze_with_openai_direct(self, request: EmailAnalysisRequest) -> EmailAnalysisResponse:

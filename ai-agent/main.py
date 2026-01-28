@@ -72,6 +72,12 @@ class AIAgent:
         try:
             database_url = os.getenv("DATABASE_URL")
             if database_url:
+                # Convert postgresql:// to postgresql+asyncpg:// for async operations
+                if database_url.startswith("postgresql://"):
+                    database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+                elif database_url.startswith("postgres://"):
+                    database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+                
                 self.db_engine = create_async_engine(database_url)
                 AsyncSessionLocal = sessionmaker(
                     self.db_engine, class_=AsyncSession, expire_on_commit=False
@@ -79,18 +85,17 @@ class AIAgent:
                 logger.info("Database connection established")
         except Exception as e:
             logger.error(f"Database connection failed: {e}")
+            # Don't raise - database is optional for AI Agent
             
     async def init_aws_services(self):
         """Initialize AWS services"""
         try:
             aws_region = os.getenv("AWS_REGION", "us-east-1")
             
-            # Initialize Bedrock client
-            if os.getenv("AWS_BEDROCK_ENDPOINT"):
-                self.bedrock_client = boto3.client(
-                    'bedrock-runtime',
-                    region_name=aws_region
-                )
+            # Initialize Bedrock client (no endpoint env needed for boto3)
+            # We enable it when a model id is provided.
+            if os.getenv("AWS_BEDROCK_MODEL_ID"):
+                self.bedrock_client = boto3.client("bedrock-runtime", region_name=aws_region)
                 logger.info("AWS Bedrock client initialized")
                 
             # Initialize S3 client
@@ -120,6 +125,13 @@ class AIAgent:
     async def analyze_email(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
         """Main email analysis function"""
         try:
+            # If configured, use Bedrock Claude for analysis
+            if self.bedrock_client and os.getenv("AWS_BEDROCK_MODEL_ID"):
+                bedrock_result = await self._analyze_with_bedrock(email_data)
+                if bedrock_result:
+                    await self.store_analysis(bedrock_result)
+                    return bedrock_result
+
             # Extract email components
             subject = email_data.get("subject", "")
             content = email_data.get("content", "")
@@ -153,6 +165,88 @@ class AIAgent:
         except Exception as e:
             logger.error(f"Email analysis failed: {e}")
             raise HTTPException(status_code=500, detail=str(e))
+
+    async def _analyze_with_bedrock(self, email_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Analyze email using AWS Bedrock (Claude) and return ai-agent result format."""
+        model_id = os.getenv("AWS_BEDROCK_MODEL_ID")
+        if not model_id:
+            return None
+
+        subject = email_data.get("subject", "")
+        content = email_data.get("content", "")
+        sender = email_data.get("sender", "")
+        recipient = email_data.get("recipient", "")
+
+        prompt = (
+            "You are an email triage assistant. Analyze the email and respond with ONLY valid JSON.\n"
+            "Return fields:\n"
+            "- priority: one of [low, medium, high, urgent]\n"
+            "- category: one of [work, personal, marketing, notification, spam]\n"
+            "- sentiment: one of [positive, negative, neutral]\n"
+            "- recommendations: array of {type, content, confidence, reasoning}\n"
+            "- confidence_score: number 0..1\n"
+            "Email:\n"
+            f"From: {sender}\n"
+            f"To: {recipient}\n"
+            f"Subject: {subject}\n"
+            f"Content:\n{content}\n"
+        )
+
+        temperature = float(os.getenv("AI_TEMPERATURE", "0.3"))
+        max_tokens = int(os.getenv("AWS_BEDROCK_MAX_TOKENS", "800"))
+
+        body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [{"type": "text", "text": prompt}],
+                }
+            ],
+        }
+
+        try:
+            resp = self.bedrock_client.invoke_model(
+                modelId=model_id,
+                body=json.dumps(body).encode("utf-8"),
+                accept="application/json",
+                contentType="application/json",
+            )
+            raw = resp["body"].read()
+            payload = json.loads(raw)
+            # Claude returns content blocks
+            text_blocks = payload.get("content", [])
+            text = ""
+            for block in text_blocks:
+                if block.get("type") == "text":
+                    text += block.get("text", "")
+
+            # Extract JSON from the response text
+            text = text.strip()
+            if not text:
+                return None
+            start = text.find("{")
+            end = text.rfind("}")
+            if start == -1 or end == -1 or end <= start:
+                return None
+            parsed = json.loads(text[start : end + 1])
+
+            result = {
+                "email_id": email_data.get("id"),
+                "priority": parsed.get("priority", "medium"),
+                "category": parsed.get("category", "personal"),
+                "sentiment": parsed.get("sentiment", "neutral"),
+                "recommendations": parsed.get("recommendations", []),
+                "confidence_score": float(parsed.get("confidence_score", 0.6)),
+                "processed_at": datetime.utcnow().isoformat(),
+                "agent_version": f"bedrock:{model_id}",
+            }
+            return result
+        except (BotoCoreError, ClientError, KeyError, ValueError, json.JSONDecodeError) as e:
+            logger.error(f"Bedrock analysis failed: {e}")
+            return None
             
     async def determine_priority(self, subject: str, content: str, sender: str) -> str:
         """Determine email priority based on rules"""

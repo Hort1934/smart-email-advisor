@@ -53,6 +53,42 @@ make prod
 docker-compose --profile production up -d
 ```
 
+### AWS EC2 Deployment
+
+#### Option 1: Infrastructure + Application (Single Command)
+
+```bash
+# Deploy everything: infrastructure + application
+./deploy-all.sh
+
+# Or using Makefile
+make deploy-all
+```
+
+**This will:**
+1. Provision AWS infrastructure (EC2, Elastic IP, Security Group)
+2. Deploy application automatically
+3. Provide access URL
+
+**Prerequisites:**
+1. Configure `terraform/terraform.tfvars` (key pair, SSH key path)
+2. Configure `.env.production` (passwords, API keys)
+3. AWS CLI configured (`aws configure`)
+
+See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for complete guide.
+
+#### Option 2: Application Only (Existing Infrastructure)
+
+```bash
+# Deploy to existing EC2 instance
+./deploy.sh ubuntu@YOUR_ELASTIC_IP
+
+# Or using Makefile
+make deploy HOST=ubuntu@YOUR_ELASTIC_IP
+```
+
+See [README_DEPLOYMENT.md](README_DEPLOYMENT.md) for details.
+
 ## Конфігурація
 
 ### Environment Variables

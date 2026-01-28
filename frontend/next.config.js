@@ -2,8 +2,6 @@
 const nextConfig = {
   output: 'export',
   trailingSlash: true,
-  basePath: process.env.NODE_ENV === 'production' ? '/smart-email-advisor' : '',
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/smart-email-advisor' : '',
   images: {
     unoptimized: true
   },

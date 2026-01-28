@@ -82,3 +82,20 @@ restore-db: ## Відновити базу даних з backup (викорис�
 	@if [ -z "$(FILE)" ]; then echo "$(RED)❌ Використання: make restore-db FILE=backup.sql$(NC)"; exit 1; fi
 	docker-compose exec -T db psql -U postgres -d smart_email_advisor < $(FILE)
 	@echo "$(GREEN)✅ База даних відновлена$(NC)"
+
+deploy: ## Deploy to AWS EC2 (використання: make deploy HOST=ubuntu@54.123.45.67)
+	@if [ -z "$(HOST)" ]; then echo "$(RED)❌ Використання: make deploy HOST=ubuntu@YOUR_ELASTIC_IP$(NC)"; echo "$(YELLOW)   Або використайте напряму: ./deploy.sh ubuntu@YOUR_ELASTIC_IP$(NC)"; exit 1; fi
+	@echo "$(GREEN)🚀 Deploying to AWS EC2...$(NC)"
+	./deploy.sh $(HOST)
+
+deploy-all: ## Deploy infrastructure + application (повний деплой)
+	@echo "$(GREEN)🚀 Deploying infrastructure and application...$(NC)"
+	./deploy-all.sh
+
+deploy-infra: ## Deploy only infrastructure (тільки інфраструктура)
+	@echo "$(GREEN)🚀 Deploying infrastructure only...$(NC)"
+	cd terraform && terraform init && terraform apply
+
+destroy-infra: ## Destroy infrastructure (видалити інфраструктуру)
+	@echo "$(RED)⚠️  Destroying infrastructure...$(NC)"
+	cd terraform && terraform destroy
