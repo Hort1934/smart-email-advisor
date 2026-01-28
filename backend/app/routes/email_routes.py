@@ -173,7 +173,7 @@ async def get_spam_emails(
 
 @router.post("/analyze-from-spam")
 async def analyze_spam_emails(
-    limit: int = 5,
+    limit: int = 20,
     email_service: EmailService = Depends(get_email_service),
     ai_service: AIService = Depends(get_ai_service),
     db: AsyncSession = Depends(get_async_session)
