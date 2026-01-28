@@ -24,18 +24,41 @@ class EmailAnalysis(Base):
     __tablename__ = "email_analyses"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    # Email identification
+    email_uid = Column(String, nullable=False, index=True)
+    message_id = Column(String, nullable=True)
+    
+    # Email content
     subject = Column(Text, nullable=False)
     content = Column(Text, nullable=False)
+    html_content = Column(Text, nullable=True)
     sender = Column(String, nullable=False)
     recipient = Column(String, nullable=False)
+    folder = Column(String, nullable=True)
+    received_at = Column(DateTime, nullable=False)
+    is_read = Column(Boolean, nullable=True)
+    
+    # AI Analysis results
     priority = Column(String, nullable=False)  # low, medium, high, urgent
     category = Column(String, nullable=False)  # work, personal, marketing, etc.
     sentiment = Column(String, nullable=False)  # positive, negative, neutral
     urgency_score = Column(Float, nullable=False)
     confidence_score = Column(Float, nullable=False)
-    key_points = Column(JSON)  # List of key points
-    suggested_actions = Column(JSON)  # List of suggested actions
+    
+    # Analysis metadata
+    processing_time = Column(Float, nullable=True)
+    model_version = Column(String, nullable=True)
+    analyzed_at = Column(DateTime, nullable=True)
+    
+    # JSON fields for complex data
+    key_points = Column(JSON)
+    recommendations = Column(JSON)
+    attachments_info = Column(JSON)
+    
+    # Legacy fields
+    suggested_actions = Column(JSON)
     ai_summary = Column(Text)
     processed_at = Column(DateTime, default=datetime.utcnow)
     
