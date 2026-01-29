@@ -58,7 +58,7 @@ export default function SystemStatus({}: SystemStatusProps) {
       }).catch(() => null)
 
       // Перевірка IMAP (через API endpoint)
-      const imapCheck = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/emails/folders`, {
+      const imapCheck = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/smart/imap-status`, {
         timeout: 10000
       }).catch(() => null)
 

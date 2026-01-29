@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react'
-import { Mail, Activity, Database, Brain, RefreshCw, AlertCircle, CheckCircle, Clock } from 'lucide-react'
+import { Mail, Activity, Database, Brain, RefreshCw, AlertCircle, CheckCircle, Clock, Settings, BarChart3 } from 'lucide-react'
 import EmailProcessingDashboard from '../components/EmailProcessingDashboard'
 import SpamAnalysisStats from '../components/SpamAnalysisStats'
 import ProcessingLogs from '../components/ProcessingLogs'
 import SystemStatus from '../components/SystemStatus'
+import SmartAssistant from '../components/SmartAssistant'
+import PersonalizationDashboard from '../components/PersonalizationDashboard'
+import EmailList from '../components/EmailList'
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'assistant' | 'personalization'>('dashboard')
   const [isProcessing, setIsProcessing] = useState(false)
   const [systemHealth, setSystemHealth] = useState<'healthy' | 'warning' | 'error'>('healthy')
+  const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null)
 
   // Перевірка статусу системи при завантаженні
   useEffect(() => {
@@ -57,7 +62,11 @@ export default function Home() {
               <Mail className="w-8 h-8 text-primary-600 mr-3" />
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Smart Email Advisor</h1>
-                <p className="text-sm text-gray-600">Dashboard обробки spam листів</p>
+                <p className="text-sm text-gray-600">
+                  {activeTab === 'dashboard' && 'Dashboard обробки email листів'}
+                  {activeTab === 'assistant' && 'AI помічник для розумного аналізу'}
+                  {activeTab === 'personalization' && 'Персональні налаштування AI'}
+                </p>
               </div>
             </div>
             
@@ -83,32 +92,106 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Navigation Tabs */}
+        <div className="mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="flex space-x-8">
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'dashboard'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('assistant')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'assistant'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <Brain className="w-4 h-4" />
+                  <span>AI Помічник</span>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('personalization')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'personalization'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <Settings className="w-4 h-4" />
+                  <span>Персоналізація</span>
+                </div>
+              </button>
+            </nav>
+          </div>
+        </div>
+
         <div className="space-y-8">
-          {/* System Status Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <SystemStatus />
-          </div>
+          {activeTab === 'dashboard' && (
+            <>
+              {/* System Status Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <SystemStatus />
+              </div>
 
-          {/* Main Dashboard */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Processing Dashboard - займає 2 колонки */}
-            <div className="lg:col-span-2">
-              <EmailProcessingDashboard 
-                isProcessing={isProcessing}
-                setIsProcessing={setIsProcessing}
-              />
-            </div>
-            
-            {/* Statistics Panel */}
-            <div className="space-y-6">
-              <SpamAnalysisStats />
-            </div>
-          </div>
+              {/* Main Dashboard */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Processing Dashboard - займає 2 колонки */}
+                <div className="lg:col-span-2">
+                  <EmailProcessingDashboard 
+                    isProcessing={isProcessing}
+                    setIsProcessing={setIsProcessing}
+                  />
+                </div>
+                
+                {/* Statistics Panel */}
+                <div className="space-y-6">
+                  <SpamAnalysisStats />
+                </div>
+              </div>
 
-          {/* Processing Logs */}
-          <div className="w-full">
-            <ProcessingLogs />
-          </div>
+              {/* Processing Logs */}
+              <div className="w-full">
+                <ProcessingLogs />
+              </div>
+            </>
+          )}
+
+          {activeTab === 'assistant' && (
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+              {/* Email List - займає 2 колонки */}
+              <div className="lg:col-span-2">
+                <EmailList 
+                  onEmailSelect={setSelectedEmailId}
+                  selectedEmailId={selectedEmailId}
+                />
+              </div>
+              
+              {/* Smart Assistant - займає 3 колонки */}
+              <div className="lg:col-span-3">
+                <SmartAssistant emailId={selectedEmailId} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'personalization' && (
+            <PersonalizationDashboard />
+          )}
         </div>
       </main>
 

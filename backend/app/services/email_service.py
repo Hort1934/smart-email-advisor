@@ -40,7 +40,7 @@ class EmailService:
         self.smtp_server = "smtp.ukr.net" 
         self.smtp_port = 465
         self.email_address = "marchenko1934@ukr.net"
-        self.email_password = "hiu8EdisHkGYevP5"
+        self.email_password = "wcxQsXh4k5qcgovT"
         self.connection = None
         
     def _clean_header(self, header_value: str) -> str:

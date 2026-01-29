@@ -2,6 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Dict
 import logging
+import json
+from datetime import datetime
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 
 from app.models.schemas import (
     EmailAnalysisRequest, 
@@ -12,6 +16,7 @@ from app.models.schemas import (
 from app.services.ai_service import AIService
 from app.services.email_service import EmailService
 from app.services.email_storage_service import EmailStorageService
+from app.services.smart_assistant_service import SmartEmailAssistant
 from app.services.database import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
@@ -100,6 +105,28 @@ async def get_smart_recommendations(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Помилка при генерації рекомендацій: {str(e)}"
         )
+
+@router.post("/{email_id}/archive")
+async def archive_email(
+    email_id: int,
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Архівування листа
+    """
+    try:
+        # Оновлюємо статус листа в базі даних
+        await db.execute(
+            text("UPDATE email_analyses SET is_archived = true WHERE id = :email_id"),
+            {"email_id": email_id}
+        )
+        await db.commit()
+        
+        return {"success": True, "message": "Лист успішно архівовано"}
+        
+    except Exception as e:
+        logger.error(f"Error archiving email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to archive email")
 
 @router.post("/batch-analyze")
 async def batch_analyze_emails(
@@ -266,6 +293,158 @@ async def analyze_spam_emails(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Помилка при аналізі spam листів: {str(e)}"
+        )
+
+@router.get("/")
+async def get_all_emails(
+    limit: int = 20,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Отримання всіх збережених листів з бази даних
+    """
+    try:
+        query = text("""
+            SELECT 
+                e.id,
+                e.sender,
+                e.recipient,
+                e.subject,
+                e.content as body,
+                e.priority,
+                false as is_spam,
+                e.received_at as created_at,
+                e.urgency_score,
+                e.communication_tone,
+                e.emotions,
+                e.practical_value,
+                e.email_uid
+            FROM email_analyses e 
+            ORDER BY e.received_at DESC 
+            LIMIT :limit OFFSET :offset
+        """)
+        
+        result = await db.execute(query, {"limit": limit, "offset": offset})
+        emails = result.fetchall()
+        
+        email_list = []
+        for email in emails:
+            # Parse emotions if it's a JSON string
+            emotions = email.emotions
+            if isinstance(emotions, str):
+                try:
+                    emotions = json.loads(emotions)
+                except:
+                    emotions = []
+            elif emotions is None:
+                emotions = []
+            
+            email_list.append({
+                "id": email.id,
+                "sender": email.sender,
+                "recipient": email.recipient,
+                "subject": email.subject,
+                "body": email.body,
+                "priority": email.priority,
+                "is_spam": email.is_spam,
+                "created_at": email.created_at.isoformat() if email.created_at else None,
+                "urgency_score": email.urgency_score,
+                "communication_tone": email.communication_tone,
+                "emotions": emotions,
+                "practical_value": email.practical_value,
+                "email_uid": email.email_uid
+            })
+        
+        # Get total count
+        count_query = text("SELECT COUNT(*) FROM email_analyses")
+        count_result = await db.execute(count_query)
+        total_count = count_result.scalar()
+        
+        return {
+            "emails": email_list,
+            "total_count": total_count,
+            "limit": limit,
+            "offset": offset
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting emails: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Помилка при отриманні листів: {str(e)}"
+        )
+
+@router.get("/{email_id}")
+async def get_email_by_id(
+    email_id: int,
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Отримання конкретного листа за ID
+    """
+    try:
+        query = text("""
+            SELECT 
+                e.id,
+                e.sender,
+                e.recipient,
+                e.subject,
+                e.content as body,
+                e.priority,
+                false as is_spam,
+                e.received_at as created_at,
+                e.urgency_score,
+                e.communication_tone,
+                e.emotions,
+                e.practical_value,
+                e.email_uid
+            FROM email_analyses e 
+            WHERE e.id = :email_id
+        """)
+        
+        result = await db.execute(query, {"email_id": email_id})
+        email = result.fetchone()
+        
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Лист не знайдено"
+            )
+        
+        # Parse emotions if it's a JSON string
+        emotions = email.emotions
+        if isinstance(emotions, str):
+            try:
+                emotions = json.loads(emotions)
+            except:
+                emotions = []
+        elif emotions is None:
+            emotions = []
+        
+        return {
+            "id": email.id,
+            "sender": email.sender,
+            "recipient": email.recipient,
+            "subject": email.subject,
+            "body": email.body,
+            "priority": email.priority,
+            "is_spam": email.is_spam,
+            "created_at": email.created_at.isoformat() if email.created_at else None,
+            "urgency_score": email.urgency_score,
+            "communication_tone": email.communication_tone,
+            "emotions": emotions,
+            "practical_value": email.practical_value,
+            "email_uid": email.email_uid
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting email {email_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Помилка при отриманні листа: {str(e)}"
         )
 
 @router.get("/folders")

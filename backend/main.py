@@ -5,7 +5,7 @@ import uvicorn
 import os
 from dotenv import load_dotenv
 
-from app.routes import email_routes, auth_routes, analytics_routes, demo_routes, stats_routes, logs_routes
+from app.routes import email_routes, auth_routes, analytics_routes, demo_routes, stats_routes, logs_routes, smart_assistant_routes
 from app.services.database import init_db
 from app.services.ai_service import AIService
 
@@ -56,6 +56,7 @@ app.include_router(email_routes.router, prefix="/api/emails", tags=["emails"])
 app.include_router(analytics_routes.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(stats_routes.router, prefix="/api/stats", tags=["statistics"])
 app.include_router(logs_routes.router, prefix="/api/logs", tags=["logs"])
+app.include_router(smart_assistant_routes.router, prefix="/api/smart", tags=["smart-assistant"])
 
 if __name__ == "__main__":
     uvicorn.run(

@@ -131,14 +131,21 @@ async def get_recent_emails(
         
         emails = []
         for row in result.fetchall():
+            # Визначаємо threat_level на основі urgency_score
+            threat_level = "low"
+            if row.urgency_score and row.urgency_score >= 0.8:
+                threat_level = "high"
+            elif row.urgency_score and row.urgency_score >= 0.5:
+                threat_level = "medium"
+            
             emails.append({
                 "id": str(row.id),
                 "subject": row.subject or "Без теми",
                 "sender": row.sender or "Невідомий відправник", 
                 "received_date": row.received_at.isoformat() if row.received_at else datetime.now().isoformat(),
                 "priority": row.priority,
-                "threat_level": "medium" if row.urgency_score > 0.5 else "low",  # Використовуємо urgency_score
-                "analysis_summary": row.ai_summary
+                "threat_level": threat_level,
+                "analysis_summary": row.ai_summary or "Автоматичний аналіз недоступний"
             })
         
         return emails
