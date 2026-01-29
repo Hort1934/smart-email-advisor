@@ -29,7 +29,15 @@ class AIService:
         openai_key = os.getenv("OPENAI_API_KEY")
         self.openai_client = None
         if openai_key and openai_key != "your-openai-api-key-here":
-            self.openai_client = openai.AsyncOpenAI(api_key=openai_key)
+            try:
+                # Initialize OpenAI client only when a real key is provided.
+                # If initialization fails (e.g. empty key), log and continue
+                # without blocking the application – AI Agent + fallback
+                # analysis will still work.
+                self.openai_client = openai.AsyncOpenAI(api_key=openai_key)
+            except Exception as e:
+                logger.error(f"Failed to initialize OpenAI client, falling back to AI Agent only: {e}")
+                self.openai_client = None
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
@@ -57,8 +65,8 @@ class AIService:
                 else:
                     logger.warning("AI Agent returned None, trying OpenAI fallback")
             
-            # Fallback до прямого виклику OpenAI (тільки якщо є API ключ)
-            if os.getenv("OPENAI_API_KEY"):
+            # Fallback до прямого виклику OpenAI (тільки якщо ініціалізовано клієнт)
+            if self.openai_client is not None:
                 try:
                     return await self._analyze_with_openai_direct(request)
                 except Exception as e:
